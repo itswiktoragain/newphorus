@@ -1,28 +1,20 @@
-(function(global) {
+(function () {
   'use strict';
-
-  var script = document.currentScript || (function(scripts) {
-    return scripts[scripts.length - 1];
-  })(document.getElementsByTagName('script'));
-
-  var hasUI = true;
-  var params = script.src.split('?')[1].split('&');
-  params.forEach(function(p) {
-    var parts = p.split('=');
-    if (parts.length > 1 && parts[0] === 'ui') {
-      hasUI = parts[1] !== 'false';
-    }
-  });
-
+  var script = document.currentScript;
+  if (!script || script.tagName.toUpperCase() !== 'SCRIPT') throw new Error('Newphorus embed: unable to locate the current script element.');
+  var scriptURL = new URL(script.src, window.location.href);
+  var embedURL = new URL('embed.html', scriptURL);
+  scriptURL.searchParams.forEach(function (value, key) { embedURL.searchParams.set(key, value); });
   var iframe = document.createElement('iframe');
-  iframe.setAttribute('allowfullscreen', true);
-  iframe.setAttribute('allowtransparency', true);
-  iframe.src = script.src.replace(/^http:/, 'https:').replace(/embed\.js/, 'embed.html');
-  iframe.width = hasUI ? 482 : 480;
-  iframe.height = hasUI ? 393 : 360;
+  iframe.src = embedURL.href;
+  iframe.setAttribute('allowfullscreen', '');
+  iframe.setAttribute('loading', 'lazy');
+  iframe.title = 'Newphorus Scratch project player';
   iframe.style.border = '0';
-  iframe.className = 'phosphorus';
-
+  var ui = scriptURL.searchParams.get('ui') !== 'false';
+  var width = Number(scriptURL.searchParams.get('w')) || 480;
+  var height = Number(scriptURL.searchParams.get('h')) || 360;
+  iframe.width = String(width);
+  iframe.height = String(height + (ui ? 54 : 0));
   script.parentNode.replaceChild(iframe, script);
-
-}(this));
+}());
