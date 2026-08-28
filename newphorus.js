@@ -17,33 +17,41 @@
   function makeURL(path, params) {
     var url = new URL(path, new URL('.', location.href));
     Object.keys(params || {}).forEach(function (key) {
-      if (params[key] !== undefined && params[key] !== null) url.searchParams.set(key, String(params[key]));
+      if (params[key] !== undefined && params[key] !== null) {
+        url.searchParams.set(key, String(params[key]));
+      }
     });
     return url;
   }
 
-  async function fetchMetadata(id) {
+  async function fetchMetadata(id, signal) {
     var lastError;
     for (var i = 0; i < META_HOSTS.length; i++) {
       try {
-        var response = await fetch(META_HOSTS[i] + encodeURIComponent(id) + '?v=' + Date.now(), {cache: 'no-store'});
-        if (response.status === 400 || response.status === 404) throw new Error('This project is unshared or does not exist.');
+        var response = await fetch(META_HOSTS[i] + encodeURIComponent(id) + '?v=' + Date.now(), {
+          cache: 'no-store',
+          signal: signal
+        });
+        if (response.status === 400 || response.status === 404) {
+          throw new Error('This project is unshared or does not exist.');
+        }
         if (!response.ok) throw new Error('Metadata request failed with HTTP ' + response.status + '.');
         return await response.json();
       } catch (error) {
+        if (error && error.name === 'AbortError') throw error;
         lastError = error;
       }
     }
     throw lastError || new Error('Could not fetch project metadata.');
   }
 
-  async function fetchProject(id, progress) {
+  async function fetchProject(id, progress, signal) {
     progress(12, 'Finding project…');
-    var metadata = await fetchMetadata(id);
+    var metadata = await fetchMetadata(id, signal);
     progress(34, 'Downloading project…');
     var url = 'https://projects.scratch.mit.edu/' + encodeURIComponent(id);
     if (metadata.project_token) url += '?token=' + encodeURIComponent(metadata.project_token);
-    var response = await fetch(url, {cache: 'no-store'});
+    var response = await fetch(url, {cache: 'no-store', signal: signal});
     if (!response.ok) throw new Error('Project download failed with HTTP ' + response.status + '.');
     var buffer = await response.arrayBuffer();
     progress(60, 'Preparing project…');
@@ -62,10 +70,17 @@
     );
   }
 
+  function isAbort(error) {
+    return !!(error && error.name === 'AbortError');
+  }
+
   function Player(options) {
     options = options || {};
-    if (!window.Scaffolding || !window.Scaffolding.Scaffolding) throw new Error('The Scratch runtime failed to load.');
+    if (!window.Scaffolding || !window.Scaffolding.Scaffolding) {
+      throw new Error('The Scratch runtime failed to load.');
+    }
 
+    this.container = options.container;
     this.statusText = options.statusText;
     this.progressBar = options.progressBar;
     this.loadingOverlay = options.loadingOverlay;
@@ -76,6 +91,8 @@
     this.projectTitle = '';
     this.turbo = false;
     this.loaded = false;
+    this.activeFetch = null;
+    this.loadQueue = Promise.resolve();
 
     this.runtime = new window.Scaffolding.Scaffolding();
     this.runtime.width = 480;
@@ -85,14 +102,21 @@
     this.runtime.shouldConnectPeripherals = true;
     this.runtime.usePackagedRuntime = false;
     this.runtime.setup();
-    if (typeof this.runtime.setAccentColor === 'function') this.runtime.setAccentColor('#1677ff');
+    if (typeof this.runtime.setAccentColor === 'function') this.runtime.setAccentColor('#111111');
     configureStorage(this.runtime);
-    this.runtime.appendTo(options.container);
+    this.runtime.appendTo(this.container);
+
+    var self = this;
+    this.container.addEventListener('pointerdown', function () {
+      self.unlockAudio();
+    }, {passive: true});
   }
 
   Player.prototype.progress = function (value, text) {
     if (this.statusText && text) this.statusText.textContent = text;
-    if (this.progressBar) this.progressBar.style.width = Math.max(0, Math.min(100, value)) + '%';
+    if (this.progressBar) {
+      this.progressBar.style.width = Math.max(0, Math.min(100, value)) + '%';
+    }
   };
 
   Player.prototype.showLoading = function () {
@@ -119,9 +143,55 @@
     console.error(error);
   };
 
+  Player.prototype.unlockAudio = function () {
+    var engine = this.runtime && this.runtime.audioEngine;
+    var context = engine && (engine.audioContext || engine._audioContext);
+    if (context && context.state !== 'running' && typeof context.resume === 'function') {
+      var promise = context.resume();
+      if (promise && typeof promise.catch === 'function') promise.catch(function () {});
+    }
+  };
+
+  Player.prototype.resetProject = async function () {
+    this.loaded = false;
+    if (!this.runtime || !this.runtime.vm) return;
+
+    try { this.runtime.stopAll(); } catch (error) {}
+    try {
+      if (typeof this.runtime.vm.clear === 'function') {
+        await Promise.resolve(this.runtime.vm.clear());
+      }
+    } catch (error) {
+      console.warn('Could not fully clear the previous project.', error);
+    }
+
+    if (this.runtime._monitors && typeof this.runtime._monitors.clear === 'function') {
+      this.runtime._monitors.clear();
+    }
+    var leftovers = this.container.querySelectorAll('.sc-monitor-root, .sc-question-root');
+    for (var i = 0; i < leftovers.length; i++) leftovers[i].remove();
+  };
+
+  Player.prototype.queueLoad = function (task) {
+    if (this.activeFetch) this.activeFetch.abort();
+    var controller = new AbortController();
+    this.activeFetch = controller;
+
+    var self = this;
+    var queued = this.loadQueue.catch(function () {}).then(function () {
+      return task(controller);
+    });
+    this.loadQueue = queued.catch(function () {});
+
+    return queued.finally(function () {
+      if (self.activeFetch === controller) self.activeFetch = null;
+    });
+  };
+
   Player.prototype.finishLoad = function () {
     this.progress(82, 'Starting runtime…');
     if (this.autoStart) {
+      this.unlockAudio();
       this.runtime.greenFlag();
     } else if (this.runtime.vm && typeof this.runtime.vm.start === 'function') {
       this.runtime.vm.start();
@@ -132,47 +202,77 @@
     this.runtime.relayout();
   };
 
-  Player.prototype.loadById = async function (value) {
+  Player.prototype.loadById = function (value) {
     var id = parseProjectId(value);
-    if (!id) throw new Error('Enter a valid Scratch project URL or numeric project ID.');
+    if (!id) return Promise.reject(new Error('Enter a valid Scratch project URL or numeric project ID.'));
+
+    var self = this;
     this.showLoading();
-    this.progress(5, 'Preparing Newphorus…');
+    this.progress(4, 'Loading project…');
     this.projectId = id;
-    try {
-      var result = await fetchProject(id, this.progress.bind(this));
-      this.projectTitle = result.metadata.title || ('Scratch project ' + id);
-      this.progress(68, 'Loading blocks and assets…');
-      await this.runtime.loadProject(result.buffer);
-      this.finishLoad();
-      return {id: id, title: this.projectTitle, url: SCRATCH_PREFIX + id + '/'};
-    } catch (error) {
-      this.showError(error);
-      throw error;
-    }
+
+    return this.queueLoad(async function (controller) {
+      self.showLoading();
+      self.progress(6, 'Clearing previous project…');
+      await self.resetProject();
+      if (controller.signal.aborted) throw new DOMException('Loading cancelled.', 'AbortError');
+
+      try {
+        var result = await fetchProject(id, self.progress.bind(self), controller.signal);
+        if (controller.signal.aborted) throw new DOMException('Loading cancelled.', 'AbortError');
+        self.projectTitle = result.metadata.title || ('Scratch project ' + id);
+        self.progress(68, 'Loading blocks and assets…');
+        await self.runtime.loadProject(result.buffer);
+        self.finishLoad();
+        return {id: id, title: self.projectTitle, url: SCRATCH_PREFIX + id + '/'};
+      } catch (error) {
+        if (!isAbort(error)) self.showError(error);
+        throw error;
+      }
+    });
   };
 
-  Player.prototype.loadFile = async function (file) {
-    if (!file) throw new Error('No project file selected.');
+  Player.prototype.loadFile = function (file) {
+    if (!file) return Promise.reject(new Error('No project file selected.'));
     var ext = (file.name.split('.').pop() || '').toLowerCase();
-    if (['sb', 'sb2', 'sb3'].indexOf(ext) === -1) throw new Error('Unsupported file type. Open a .sb, .sb2, or .sb3 project.');
+    if (['sb', 'sb2', 'sb3'].indexOf(ext) === -1) {
+      return Promise.reject(new Error('Unsupported file type. Open a .sb, .sb2, or .sb3 project.'));
+    }
+
+    var self = this;
     this.showLoading();
-    this.progress(12, 'Reading ' + file.name + '…');
+    this.progress(4, 'Loading project…');
     this.projectId = '';
     this.projectTitle = file.name;
-    try {
-      var buffer = await file.arrayBuffer();
-      this.progress(58, 'Loading blocks and assets…');
-      await this.runtime.loadProject(buffer);
-      this.finishLoad();
-      return {id: '', title: file.name, url: ''};
-    } catch (error) {
-      this.showError(error);
-      throw error;
-    }
+
+    return this.queueLoad(async function (controller) {
+      self.showLoading();
+      self.progress(8, 'Clearing previous project…');
+      await self.resetProject();
+      if (controller.signal.aborted) throw new DOMException('Loading cancelled.', 'AbortError');
+
+      try {
+        self.progress(18, 'Reading ' + file.name + '…');
+        var buffer = await file.arrayBuffer();
+        if (controller.signal.aborted) throw new DOMException('Loading cancelled.', 'AbortError');
+        self.progress(58, 'Loading blocks and assets…');
+        await self.runtime.loadProject(buffer);
+        self.finishLoad();
+        return {id: '', title: file.name, url: ''};
+      } catch (error) {
+        if (!isAbort(error)) self.showError(error);
+        throw error;
+      }
+    });
   };
 
   Player.prototype.greenFlag = function () {
-    if (this.loaded) this.runtime.greenFlag();
+    if (!this.loaded) return;
+    this.unlockAudio();
+    this.runtime.greenFlag();
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
   };
 
   Player.prototype.stopAll = function () {
@@ -181,7 +281,9 @@
 
   Player.prototype.setTurbo = function (enabled) {
     this.turbo = !!enabled;
-    if (this.runtime.vm && typeof this.runtime.vm.setTurboMode === 'function') this.runtime.vm.setTurboMode(this.turbo);
+    if (this.runtime.vm && typeof this.runtime.vm.setTurboMode === 'function') {
+      this.runtime.vm.setTurboMode(this.turbo);
+    }
     return this.turbo;
   };
 
@@ -190,7 +292,7 @@
   };
 
   Player.prototype.relayout = function () {
-    this.runtime.relayout();
+    if (this.runtime) this.runtime.relayout();
   };
 
   function requestFullscreen(element, player) {
@@ -202,16 +304,23 @@
   }
 
   function wireControls(player, fullscreenElement) {
-    document.getElementById('flag-button').addEventListener('click', player.greenFlag.bind(player));
-    document.getElementById('stop-button').addEventListener('click', player.stopAll.bind(player));
+    document.getElementById('flag-button').addEventListener('click', function () {
+      player.greenFlag();
+    });
+    document.getElementById('stop-button').addEventListener('click', function () {
+      player.stopAll();
+    });
     document.getElementById('turbo-button').addEventListener('click', function (event) {
       event.currentTarget.setAttribute('aria-pressed', player.toggleTurbo() ? 'true' : 'false');
+      if (document.activeElement) document.activeElement.blur();
     });
     document.getElementById('fullscreen-button').addEventListener('click', function () {
       requestFullscreen(fullscreenElement, player);
     });
     ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (name) {
-      document.addEventListener(name, function () { setTimeout(player.relayout.bind(player), 50); });
+      document.addEventListener(name, function () {
+        setTimeout(player.relayout.bind(player), 50);
+      });
     });
   }
 
@@ -244,14 +353,13 @@
         scratchLink.hidden = false;
         scratchLink.href = info.url;
         embedCode.value = '<iframe src="' + makeURL('embed.html', {id: info.id, 'auto-start': 'false'}).href +
-          '" width="482" height="420" allowfullscreen></iframe>';
+          '" width="482" height="412" allowfullscreen></iframe>';
         standalone.href = makeURL('app.html', {id: info.id}).href;
       } else {
         scratchLink.hidden = true;
         embedCode.value = 'Local files cannot be embedded by URL.';
         standalone.removeAttribute('href');
       }
-      setTimeout(function () { section.scrollIntoView({behavior: 'smooth', block: 'start'}); }, 30);
     }
 
     async function loadId(value, changeHash) {
@@ -266,7 +374,9 @@
         var info = await player.loadById(id);
         updateUI(info);
         document.title = info.title + ' · Newphorus';
-      } catch (error) {}
+      } catch (error) {
+        if (!isAbort(error)) console.error(error);
+      }
     }
 
     document.getElementById('project-form').addEventListener('submit', function (event) {
@@ -282,12 +392,15 @@
         updateUI(info);
         document.title = info.title + ' · Newphorus';
         history.replaceState(null, '', location.pathname + location.search);
-      } catch (error) {}
+      } catch (error) {
+        if (!isAbort(error)) console.error(error);
+      }
     }
 
     fileInput.addEventListener('change', function () {
-      loadLocal(fileInput.files && fileInput.files[0]);
+      var file = fileInput.files && fileInput.files[0];
       fileInput.value = '';
+      loadLocal(file);
     });
 
     var dragDepth = 0;
@@ -341,7 +454,9 @@
     player.loadById(id).then(function (info) {
       document.title = info.title + ' · Newphorus';
       document.getElementById('project-title').textContent = info.title;
-    }).catch(function () {});
+    }).catch(function (error) {
+      if (!isAbort(error)) console.error(error);
+    });
     return player;
   }
 
@@ -369,7 +484,9 @@
       document.title = info.title + ' · Newphorus';
       if (parent !== window) parent.postMessage({type: 'newphorus-load', id: id, title: info.title}, '*');
     }).catch(function (error) {
-      if (parent !== window) parent.postMessage({type: 'newphorus-error', id: id, message: error.message}, '*');
+      if (!isAbort(error) && parent !== window) {
+        parent.postMessage({type: 'newphorus-error', id: id, message: error.message}, '*');
+      }
     });
     return player;
   }
