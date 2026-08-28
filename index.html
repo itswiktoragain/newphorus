@@ -1,272 +1,125 @@
 <!doctype html>
-<meta charset=utf-8>
-<meta name=viewport content="width=device-width, initial-scale=1.0">
-<title>phosphorus</title>
-<link rel=stylesheet href=player.css>
-<link rel=stylesheet href=index.css>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1677ff">
+  <meta name="description" content="Newphorus — a fast, modern Scratch 1, 2, and 3 project player.">
+  <title>Newphorus</title>
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="Newphorus home">
+      <span class="brand-mark" aria-hidden="true">N</span>
+      <span>Newphorus</span>
+    </a>
+    <div class="version-pill">Scratch 1 · 2 · 3</div>
+    <a class="header-link" href="https://github.com/itswiktoragain/newphorus" target="_blank" rel="noreferrer">GitHub</a>
+  </header>
 
-<div class=area id=title-area>
-<h1 class=title>phosphorus</h1>
-<p>phosphorus runs your Scratch projects really fast by compiling them to JavaScript. Try it out by pasting a URL or project ID into the field below or <a class=dropdown>choosing an example<select id=examples>
-  <option value>
-  <option value=11397100>3D Remix by DadOfMrLog
-  <option value=15945630>O by DCPU-16
-  <option value=10128407>Paper Minecraft by griffpatch
-  <option value=16207935>Alone in the depths by sticku
-  <option value=16205373>3D Framework by DadOfMrLog
-  <option value=31903442>gb.sb2 [Dr. Mario] by DCPU-16
-  <option value=34791164>gb.sb2 [Mario Land 2] by DCPU-16
-  <option value=21554369>Epic Ninja by griffpatch
-  <option value=15832807>Pretty by blob8108
-</select></a>.</p>
-</div>
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Scratch project player</p>
+        <h1>Run Scratch projects in your browser.</h1>
+        <p class="hero-text">Paste a Scratch project URL or ID, or open a local <strong>.sb</strong>, <strong>.sb2</strong>, or <strong>.sb3</strong> file.</p>
 
-<div class=area id=player-area>
-<div class=controls>
-  <span class=stop></span>
-  <span class=pause></span>
-  <span class=flag title="Shift+click to enable turbo mode."></span>
-  <div class=turbo>Turbo Mode</div>
-  <span class=full-screen></span>
-</div>
-<div class=player></div>
-<div class=internal-error>
-  An internal error occurred. <a id=error-bug-link target=_blank href=https://github.com/nathan/phosphorus/issues/new>Click here</a> to file a bug report.
-</div>
-</div>
+        <form id="project-form" class="load-panel">
+          <label for="project-input">Project URL or ID</label>
+          <div class="input-row">
+            <input id="project-input" type="text" inputmode="numeric" autocomplete="off" placeholder="https://scratch.mit.edu/projects/123456789/">
+            <button class="primary-button" type="submit">Load project</button>
+          </div>
+          <div class="file-row">
+            <span>or</span>
+            <label class="secondary-button" for="project-file">Open project file</label>
+            <input id="project-file" class="visually-hidden" type="file" accept=".sb,.sb2,.sb3,application/zip">
+            <span class="drop-hint">You can also drop a project file anywhere on this page.</span>
+          </div>
+        </form>
+      </div>
+    </section>
 
-<div class=title>
-  <div class=progress-bar></div>
-  <input class=url value=https://scratch.mit.edu/projects/>
-  <a target=_blank class=project-link title="View project on Scratch"></a>
-</div>
+    <section id="player-section" class="player-section" hidden>
+      <div class="player-card">
+        <div class="player-toolbar">
+          <div class="project-meta">
+            <span id="project-title" class="project-title">Project</span>
+            <a id="scratch-link" class="project-link" target="_blank" rel="noreferrer" hidden>View on Scratch ↗</a>
+          </div>
+          <div class="player-controls" aria-label="Player controls">
+            <button id="flag-button" class="control-button flag-button" type="button" title="Green flag">▶</button>
+            <button id="stop-button" class="control-button stop-button" type="button" title="Stop">■</button>
+            <button id="turbo-button" class="control-button" type="button" aria-pressed="false" title="Toggle turbo mode">Turbo</button>
+            <button id="fullscreen-button" class="control-button" type="button" title="Fullscreen">⛶</button>
+          </div>
+        </div>
 
-<div class=area id=project-area>
-<section class=package>
-  <h1>Package this project</h1>
-  <p>Get a link to a web page that automatically runs your project.</p>
-  <p>
-    <a href=# target=_blank id=package-link>Package</a>
-    <input type=checkbox id=package-turbo>
-    <label for=package-turbo>Turbo mode</label>
-    <input type=checkbox id=package-full-screen checked>
-    <label for=package-full-screen>Full screen</label>
-  </p>
-</section>
-<section class=package>
-  <h1>Embed this project</h1>
-  <p>Include the phosphorus player in your web site.</p>
-  <p>
-    <input readonly id=embed-code>
-    <input type=checkbox id=embed-auto-start checked>
-    <label for=embed-auto-start>Start automatically</label>
-    <input type=checkbox id=embed-light-content>
-    <label for=embed-light-content>Light controls</label>
-    <input type=checkbox id=embed-hide-controls>
-    <label for=embed-hide-controls>Hide UI</label>
-  </p>
-</section>
-<section>
-  <h1>Report a problem</h1>
-  <p>phosphorus is still in development. <a id=bug-link target=_blank href=https://github.com/nathan/phosphorus/issues/new>Click here</a> to report a problem with this project.</p>
-</section>
-</div>
-<section>
-  <h1>Credits</h1>
-  <p>phosphorus was created by <a href=https://github.com/nathan>Nathan</a>. Its CPS-style compilation and overall design was inspired by <a href=https://github.com/RHY3756547>Rhys</a>'s <a href=https://code.google.com/p/sb2-js/>sb2.js</a>. It would have more bugs if not for <a href=https://github.com/trumank>Truman</a> and <a href=https://github.com/tjvr>Tim</a>. It uses the <a href=https://stuk.github.io/jszip/>JSZip</a> library, created by <a href=https://github.com/stuk>Stuart Knightley</a>, <a href=https://github.com/dduponchel>David Duponchel</a>, Franz Buchinger, and <a href=https://github.com/aadsm>António Afonso</a>, to read <code>.sb2</code> files and compressed projects, and the <a href=https://code.google.com/p/canvg/>canvg</a> library, created by <a href=https://code.google.com/u/gabelerner@gmail.com/>Gabe Lerner</a>, to render SVGs in <code>&lt;canvas&gt;</code> elements.
-  <h1>Code</h1>
-  <p>The source code for phosphorus is available <a href=https://github.com/nathan/phosphorus>on GitHub</a>.</p>
-</section>
-<script src=fonts.js></script>
-<script src=//cdnjs.cloudflare.com/ajax/libs/jszip/2.4.0/jszip.js></script>
-<script src=lib/rgbcolor.js></script>
-<script src=lib/StackBlur.js></script>
-<script src=lib/canvg.js></script>
-<script src=phosphorus.js></script>
-<script src=player.js></script>
-<script>
+        <div id="stage-shell" class="stage-shell">
+          <div id="stage" class="stage" aria-label="Scratch project stage"></div>
+          <div id="loading-overlay" class="loading-overlay" aria-live="polite">
+            <div class="loading-card">
+              <div class="spinner" aria-hidden="true"></div>
+              <strong id="status-text">Preparing Newphorus…</strong>
+              <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
+            </div>
+          </div>
+          <div id="error-overlay" class="error-overlay" hidden>
+            <div class="error-card">
+              <strong>Couldn’t load this project.</strong>
+              <p id="error-text"></p>
+              <a href="https://github.com/itswiktoragain/newphorus/issues/new" target="_blank" rel="noreferrer">Report a problem ↗</a>
+            </div>
+          </div>
+        </div>
+      </div>
 
-(function() {
-  'use strict';
+      <div class="tools-grid">
+        <section class="tool-card">
+          <p class="eyebrow">Embed</p>
+          <h2>Put this project on a page</h2>
+          <p>Copy an iframe that uses the Newphorus embed player.</p>
+          <input id="embed-code" class="code-field" readonly aria-label="Embed code">
+        </section>
+        <section class="tool-card">
+          <p class="eyebrow">Standalone</p>
+          <h2>Open the focused player</h2>
+          <p>Launch a clean player page for the currently loaded project.</p>
+          <a id="standalone-link" class="secondary-button inline-button" target="_blank">Open standalone player ↗</a>
+        </section>
+      </div>
+    </section>
 
-  var prefix = 'https://scratch.mit.edu/projects/';
+    <section class="info-grid">
+      <article>
+        <span class="feature-icon" aria-hidden="true">3</span>
+        <h2>Scratch 3 support</h2>
+        <p>Newphorus loads modern Scratch 3 projects and local .sb3 files, while retaining support for older project formats.</p>
+      </article>
+      <article>
+        <span class="feature-icon" aria-hidden="true">⚡</span>
+        <h2>Compiled runtime</h2>
+        <p>The execution backend uses TurboWarp’s compiler-enabled Scratch runtime for fast browser playback.</p>
+      </article>
+      <article>
+        <span class="feature-icon" aria-hidden="true">↔</span>
+        <h2>Responsive player</h2>
+        <p>The stage scales cleanly from desktop to mobile and includes fullscreen and turbo controls.</p>
+      </article>
+    </section>
+  </main>
 
-  var initialId = location.hash.substr(1);
-  if (initialId === 'zip') initialId = '';
+  <footer>
+    <span>Newphorus</span>
+    <span class="footer-separator">•</span>
+    <a href="https://github.com/itswiktoragain/newphorus/issues" target="_blank" rel="noreferrer">Report an issue</a>
+  </footer>
 
-  var titleArea = document.querySelector('#title-area');
-  var playerArea = document.querySelector('#player-area');
-  var projectArea = document.querySelector('#project-area');
-
-  playerArea.style.height = projectArea.style.height = 'auto';
-  var titleAreaHeight = titleArea.offsetHeight;
-  var playerAreaHeight = playerArea.offsetHeight;
-  var projectAreaHeight = projectArea.offsetHeight;
-  playerArea.style.height = projectArea.style.height = 0;
-
-  var examples = document.querySelector('#examples');
-  var urlInput = document.querySelector('.url');
-  urlInput.value = prefix + initialId;
-
-  var progressBar = document.querySelector('.progress-bar');
-  var player = document.querySelector('.player');
-  var projectLink = document.querySelector('.project-link');
-  var bugLink = document.querySelector('#bug-link');
-
-  var packageLink = document.querySelector('#package-link');
-  var packageTurbo = document.querySelector('#package-turbo');
-  var packageFullScreen = document.querySelector('#package-full-screen');
-
-  var embedCode = document.querySelector('#embed-code');
-  var embedAutoStart = document.querySelector('#embed-auto-start');
-  var embedLightContent = document.querySelector('#embed-light-content');
-  var embedHideControls = document.querySelector('#embed-hide-controls');
-
-  var timeout;
-  urlInput.addEventListener('input', function() {
-    var ss = urlInput.selectionStart;
-    var se = urlInput.selectionEnd;
-    var url = urlInput.value;
-    var id = url.match(/\d+/g) || [''];
-    while (id.length > 1 && id.indexOf(P.player.projectId) > -1) {
-      id.splice(id.indexOf(P.player.projectId), 1);
-    }
-    id = id[0];
-    urlInput.value = url = prefix + id;
-    urlInput.selectionStart = urlInput.selectionEnd = Math.max(prefix.length, ss);
-    clearTimeout(timeout);
-    if (P.player.projectId !== id) {
-      timeout = setTimeout(function() {
-        location.hash = '#' + id;
-      }, 300);
-    }
-  });
-  urlInput.addEventListener('focus', function() {
-    setTimeout(function() {
-      if (/\d/.test(urlInput.value)) {
-        urlInput.select();
-      }
-    });
-  });
-
-  examples.addEventListener('change', function() {
-    if (examples.value) {
-      location.hash = '#' + examples.value;
-      examples.selectedIndex = 0;
-    }
-  });
-
-  window.addEventListener('hashchange', function() {
-    var id = location.hash.substr(1);
-    if (id !== 'zip') {
-      if (+id !== +id) id = '';
-      urlInput.value = prefix + id;
-    }
-    load(id);
-  });
-
-  function show(id) {
-    titleArea.style.height = id ? 0 : titleAreaHeight + 'px';
-    playerArea.style.height = id ? playerAreaHeight + 'px' : 0
-    projectArea.style.height = id ? projectAreaHeight + 'px' : 0;
-    if (!id) urlInput.focus();
-  }
-
-  function load(id) {
-    if (id !== 'zip') {
-      show(id);
-    } else {
-      id = '';
-    }
-
-    document.title = 'phosphorus';
-    P.player.load(id, function(stage) {
-      stage.triggerGreenFlag();
-    }, function(title) {
-      document.title = title ? title + ' \xb7 phosphorus' : 'phosphorus';
-      updateBugLink();
-    });
-
-    projectLink.href = P.player.projectURL;
-    updateBugLink();
-    updatePackageLink();
-    updateEmbedCode();
-  }
-
-  function updateBugLink() {
-    bugLink.href = P.player.projectId ? 'https://github.com/nathan/phosphorus/issues/new?title=' + encodeURIComponent(P.player.projectTitle || P.player.projectURL) + '&body=' + encodeURIComponent('\n\n\n' + P.player.projectURL + '\nhttps://phosphorus.github.io/#' + P.player.projectId + '\n' + navigator.userAgent) : 'https://github.com/nathan/phosphorus/issues/new?body=' + encodeURIComponent('\n\n\n' + navigator.userAgent);
-  }
-
-  function updatePackageLink() {
-    packageLink.href = P.player.projectId ? '/app.html?id=' + P.player.projectId + '&turbo=' + packageTurbo.checked + '&full-screen=' + packageFullScreen.checked : 'about:blank';
-  }
-
-  packageTurbo.addEventListener('change', updatePackageLink);
-  packageFullScreen.addEventListener('change', updatePackageLink);
-
-  function updateEmbedCode(e) {
-    embedCode.value = P.player.projectId ? '<script src=https://' + location.host + '/embed.js?id=' + P.player.projectId + (embedHideControls.checked ? '&ui=false' : '&auto-start=' + embedAutoStart.checked + '&light-content=' + embedLightContent.checked) + '></' + 'script>' : '';
-    embedAutoStart.disabled =
-    embedLightContent.disabled = embedHideControls.checked;
-    if (embedHideControls.checked) embedAutoStart.checked = true;
-    if (e) embedCode.focus();
-  }
-
-  function selectEmbedCode() {
-    setTimeout(function() {
-      embedCode.select();
-    });
-  }
-
-  embedCode.addEventListener('focus', selectEmbedCode);
-  embedCode.addEventListener('click', selectEmbedCode);
-  embedHideControls.addEventListener('change', updateEmbedCode);
-  embedAutoStart.addEventListener('change', updateEmbedCode);
-  embedLightContent.addEventListener('change', updateEmbedCode);
-
-  load(initialId);
-
-  setTimeout(function() {
-    function setTransition(el) {
-      el.style.WebkitTransition =
-      el.style.MozTransition =
-      el.style.OTransition =
-      el.style.transition = 'height 0.2s';
-    }
-    setTransition(titleArea);
-    setTransition(playerArea);
-    setTransition(projectArea);
-  });
-
-  function cancel(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
-  }
-  document.body.addEventListener('dragover', cancel);
-  document.body.addEventListener('dragenter', cancel);
-
-  document.body.addEventListener('drop', function(e) {
-    e.preventDefault();
-
-    var f = e.dataTransfer.files[0];
-
-    if (f) {
-      location.hash = '#zip';
-      show('zip');
-      var ext = f.name.split('.').pop();
-      if (ext === 'sb2' || ext === 'zip') {
-        var request = P.IO.loadSB2File(f);
-      } else if (ext === 'json') {
-        request = P.IO.loadJSONFile(f);
-      }
-      if (request) {
-        P.player.showProgress(request, function(stage) {
-          stage.triggerGreenFlag();
-        });
-      }
-    }
-  });
-
-}());
-
-</script>
+  <script src="https://cdn.jsdelivr.net/npm/@turbowarp/scaffolding@0.2.0/dist/scaffolding-min.js"></script>
+  <script src="newphorus.js"></script>
+  <script>
+    Newphorus.bootstrapHome();
+  </script>
+</body>
+</html>
