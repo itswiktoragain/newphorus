@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#ffffff">
   <meta name="description" content="Newphorus — a modern Scratch 1, 2, and 3 project player.">
   <title>Newphorus</title>
-  <link rel="stylesheet" href="index.css?v=20260828-4">
+  <link rel="stylesheet" href="index.css?v=20260828-6">
 </head>
 <body>
   <header class="site-header">
@@ -39,14 +39,28 @@
             <a id="scratch-link" class="project-link" target="_blank" rel="noreferrer" hidden>Scratch ↗</a>
           </div>
           <div class="player-controls" aria-label="Player controls">
-            <button id="flag-button" class="control-button flag-button" type="button" title="Green flag">▶</button>
-            <button id="stop-button" class="control-button stop-button" type="button" title="Stop">■</button>
+            <button id="flag-button" class="control-button icon-button flag-button" type="button" title="Green flag" aria-label="Green flag">
+              <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4m0 1c4-3 8 3 14 0v9c-6 3-10-3-14 0"/></svg>
+            </button>
+            <button id="pause-button" class="control-button icon-button pause-button" type="button" title="Pause project" aria-label="Pause or resume project" aria-pressed="false">
+              <svg class="control-icon pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg>
+              <svg class="control-icon resume-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 9 6-9 6Z"/></svg>
+            </button>
+            <button id="stop-button" class="control-button icon-button stop-button" type="button" title="Stop" aria-label="Stop project">
+              <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+            </button>
             <button id="turbo-button" class="control-button" type="button" aria-pressed="false" title="Turbo mode">Turbo</button>
-            <button id="fullscreen-button" class="control-button" type="button" title="Fullscreen">⛶</button>
+            <button id="opengl-button" class="control-button opengl-button" type="button" aria-pressed="true" title="OpenGL rendering">OpenGL on</button>
+            <button id="fullscreen-button" class="control-button icon-button" type="button" title="Fullscreen" aria-label="Fullscreen">
+              <svg class="control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H4v5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>
+            </button>
           </div>
         </div>
         <div id="stage-shell" class="stage-shell">
           <div id="stage" class="stage" aria-label="Scratch project stage"></div>
+          <button id="start-overlay" class="start-overlay" type="button" title="Start project" aria-label="Start project" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4m0 1c4-3 8 3 14 0v9c-6 3-10-3-14 0"/></svg>
+          </button>
           <div id="loading-overlay" class="loading-overlay" aria-live="polite">
             <div class="loading-card">
               <div class="spinner" aria-hidden="true"></div><strong id="status-text">Loading…</strong>
@@ -79,8 +93,9 @@
     <a href="https://github.com/itswiktoragain/newphorus/issues" target="_blank" rel="noreferrer">Issues</a>
   </footer>
 
+  <script src="graphics-mode.js?v=20260828-6"></script>
   <script src="https://cdn.jsdelivr.net/npm/@turbowarp/scaffolding@0.4.0/dist/scaffolding-with-music.js"></script>
-  <script src="newphorus.js?v=20260828-5"></script>
+  <script src="newphorus.js?v=20260828-6"></script>
   <script>
     var newphorusPlayer = Newphorus.bootstrapHome();
     var relayoutFrame = 0;
@@ -93,8 +108,6 @@
       });
     }
 
-    // Scaffolding caches the stage's viewport rectangle for mouse coordinates.
-    // Refresh it whenever scrolling or viewport changes move the stage.
     document.addEventListener('scroll', refreshPointerGeometry, {capture: true, passive: true});
     window.addEventListener('resize', refreshPointerGeometry, {passive: true});
     if (window.visualViewport) {
