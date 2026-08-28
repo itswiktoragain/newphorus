@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#1677ff">
+  <meta name="theme-color" content="#ffffff">
   <title>Newphorus</title>
-  <link rel="stylesheet" href="index.css?v=20260828-3">
-  <link rel="stylesheet" href="app.css?v=20260828-3">
+  <link rel="stylesheet" href="index.css?v=20260828-4">
+  <link rel="stylesheet" href="app.css?v=20260828-4">
 </head>
 <body class="app-page">
   <main id="app-player" class="app-player">
     <div class="app-bar">
-      <a class="brand compact-brand" href="./"><span class="brand-mark" aria-hidden="true">N</span><span>Newphorus</span></a>
+      <a class="brand compact-brand" href="./">Newphorus</a>
       <span id="project-title" class="app-project-title">Loading project…</span>
       <div class="player-controls">
         <button id="flag-button" class="control-button flag-button" type="button" title="Green flag">▶</button>
@@ -23,13 +23,13 @@
     <div class="app-stage-wrap">
       <div id="stage" class="stage"></div>
       <div id="loading-overlay" class="loading-overlay">
-        <div class="loading-card"><div class="spinner" aria-hidden="true"></div><strong id="status-text">Preparing Newphorus…</strong><div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div></div>
+        <div class="loading-card"><div class="spinner" aria-hidden="true"></div><strong id="status-text">Loading…</strong><div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div></div>
       </div>
-      <div id="error-overlay" class="error-overlay" hidden><div class="error-card"><strong>Couldn’t load this project.</strong><p id="error-text"></p><a href="https://github.com/itswiktoragain/newphorus/issues/new" target="_blank" rel="noreferrer">Report a problem ↗</a></div></div>
+      <div id="error-overlay" class="error-overlay" hidden><div class="error-card"><strong>Couldn’t load this project.</strong><p id="error-text"></p><a href="https://github.com/itswiktoragain/newphorus/issues/new" target="_blank" rel="noreferrer">Report issue ↗</a></div></div>
     </div>
   </main>
-  <script src="https://cdn.jsdelivr.net/npm/@turbowarp/scaffolding@0.4.0/dist/scaffolding-min.js"></script>
-  <script src="newphorus.js?v=20260828-3"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turbowarp/scaffolding@0.4.0/dist/scaffolding-with-music.js"></script>
+  <script src="newphorus.js?v=20260828-4"></script>
   <script>Newphorus.bootstrapStandalone();</script>
 </body>
 </html>
