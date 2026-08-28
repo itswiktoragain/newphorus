@@ -71,7 +71,7 @@
     this.loadingOverlay = options.loadingOverlay;
     this.errorOverlay = options.errorOverlay;
     this.errorText = options.errorText;
-    this.autoStart = options.autoStart !== false;
+    this.autoStart = options.autoStart === true;
     this.projectId = '';
     this.projectTitle = '';
     this.turbo = false;
@@ -96,12 +96,20 @@
   };
 
   Player.prototype.showLoading = function () {
-    if (this.loadingOverlay) this.loadingOverlay.hidden = false;
+    if (this.loadingOverlay) {
+      this.loadingOverlay.style.removeProperty('display');
+      this.loadingOverlay.hidden = false;
+      this.loadingOverlay.removeAttribute('aria-hidden');
+    }
     if (this.errorOverlay) this.errorOverlay.hidden = true;
   };
 
   Player.prototype.hideLoading = function () {
-    if (this.loadingOverlay) this.loadingOverlay.hidden = true;
+    if (this.loadingOverlay) {
+      this.loadingOverlay.hidden = true;
+      this.loadingOverlay.setAttribute('aria-hidden', 'true');
+      this.loadingOverlay.style.setProperty('display', 'none', 'important');
+    }
   };
 
   Player.prototype.showError = function (error) {
@@ -119,9 +127,8 @@
       this.runtime.vm.start();
     }
     this.loaded = true;
-    this.progress(100, 'Ready');
-    var self = this;
-    setTimeout(function () { self.hideLoading(); }, 180);
+    this.progress(100, this.autoStart ? 'Ready' : 'Ready — press ▶ to start');
+    this.hideLoading();
     this.runtime.relayout();
   };
 
@@ -224,7 +231,7 @@
     var section = document.getElementById('player-section');
     var input = document.getElementById('project-input');
     var fileInput = document.getElementById('project-file');
-    var player = makePlayer(true);
+    var player = makePlayer(false);
     wireControls(player, document.getElementById('stage-shell'));
 
     function updateUI(info) {
@@ -236,7 +243,7 @@
       if (info.id) {
         scratchLink.hidden = false;
         scratchLink.href = info.url;
-        embedCode.value = '<iframe src="' + makeURL('embed.html', {id: info.id}).href +
+        embedCode.value = '<iframe src="' + makeURL('embed.html', {id: info.id, 'auto-start': 'false'}).href +
           '" width="482" height="420" allowfullscreen></iframe>';
         standalone.href = makeURL('app.html', {id: info.id}).href;
       } else {
@@ -313,7 +320,7 @@
       input.value = SCRATCH_PREFIX + initialId + '/';
       loadId(initialId, false);
     } else {
-      document.getElementById('loading-overlay').hidden = true;
+      player.hideLoading();
     }
     return player;
   }
@@ -321,7 +328,7 @@
   function bootstrapStandalone() {
     var params = new URLSearchParams(location.search);
     var id = parseProjectId(params.get('id'));
-    var player = makePlayer(true);
+    var player = makePlayer(false);
     if (params.get('turbo') === 'true') {
       player.setTurbo(true);
       document.getElementById('turbo-button').setAttribute('aria-pressed', 'true');
@@ -342,7 +349,7 @@
     var params = new URLSearchParams(location.search);
     var id = parseProjectId(params.get('id'));
     var showUI = params.get('ui') !== 'false';
-    var player = makePlayer(params.get('auto-start') !== 'false');
+    var player = makePlayer(params.get('auto-start') === 'true');
     if (!showUI) document.body.classList.add('ui-hidden');
     wireControls(player, document.documentElement);
 
