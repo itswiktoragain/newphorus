@@ -3,42 +3,32 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#1677ff">
-  <meta name="description" content="Newphorus — a fast, modern Scratch 1, 2, and 3 project player.">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Newphorus — a modern Scratch 1, 2, and 3 project player.">
   <title>Newphorus</title>
-  <link rel="stylesheet" href="index.css?v=20260828-3">
+  <link rel="stylesheet" href="index.css?v=20260828-4">
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="./" aria-label="Newphorus home">
-      <span class="brand-mark" aria-hidden="true">N</span>
-      <span>Newphorus</span>
-    </a>
-    <div class="version-pill">Scratch 1 · 2 · 3</div>
+    <a class="brand" href="./">Newphorus</a>
     <a class="header-link" href="https://github.com/itswiktoragain/newphorus" target="_blank" rel="noreferrer">GitHub</a>
   </header>
 
   <main>
     <section class="hero">
-      <div class="hero-copy">
-        <p class="eyebrow">Scratch project player</p>
-        <h1>Run Scratch projects in your browser.</h1>
-        <p class="hero-text">Paste a Scratch project URL or ID, or open a local <strong>.sb</strong>, <strong>.sb2</strong>, or <strong>.sb3</strong> file.</p>
-
-        <form id="project-form" class="load-panel">
-          <label for="project-input">Project URL or ID</label>
-          <div class="input-row">
-            <input id="project-input" type="text" inputmode="numeric" autocomplete="off" placeholder="https://scratch.mit.edu/projects/123456789/">
-            <button class="primary-button" type="submit">Load project</button>
-          </div>
-          <div class="file-row">
-            <span>or</span>
-            <label class="secondary-button" for="project-file">Open project file</label>
-            <input id="project-file" class="visually-hidden" type="file" accept=".sb,.sb2,.sb3,application/zip">
-            <span class="drop-hint">You can also drop a project file anywhere on this page.</span>
-          </div>
-        </form>
-      </div>
+      <h1>Run Scratch projects.</h1>
+      <p class="hero-text">Paste a Scratch project URL or ID, or open a local .sb, .sb2, or .sb3 file.</p>
+      <form id="project-form" class="load-panel">
+        <div class="input-row">
+          <input id="project-input" type="text" inputmode="numeric" autocomplete="off" aria-label="Scratch project URL or ID" placeholder="https://scratch.mit.edu/projects/123456789/">
+          <button class="primary-button" type="submit">Load</button>
+        </div>
+        <div class="file-row">
+          <label class="secondary-button" for="project-file">Open file</label>
+          <input id="project-file" class="visually-hidden" type="file" accept=".sb,.sb2,.sb3,application/zip">
+          <span>or drop a project file anywhere on this page</span>
+        </div>
+      </form>
     </section>
 
     <section id="player-section" class="player-section" hidden>
@@ -46,22 +36,20 @@
         <div class="player-toolbar">
           <div class="project-meta">
             <span id="project-title" class="project-title">Project</span>
-            <a id="scratch-link" class="project-link" target="_blank" rel="noreferrer" hidden>View on Scratch ↗</a>
+            <a id="scratch-link" class="project-link" target="_blank" rel="noreferrer" hidden>Scratch ↗</a>
           </div>
           <div class="player-controls" aria-label="Player controls">
             <button id="flag-button" class="control-button flag-button" type="button" title="Green flag">▶</button>
             <button id="stop-button" class="control-button stop-button" type="button" title="Stop">■</button>
-            <button id="turbo-button" class="control-button" type="button" aria-pressed="false" title="Toggle turbo mode">Turbo</button>
+            <button id="turbo-button" class="control-button" type="button" aria-pressed="false" title="Turbo mode">Turbo</button>
             <button id="fullscreen-button" class="control-button" type="button" title="Fullscreen">⛶</button>
           </div>
         </div>
-
         <div id="stage-shell" class="stage-shell">
           <div id="stage" class="stage" aria-label="Scratch project stage"></div>
           <div id="loading-overlay" class="loading-overlay" aria-live="polite">
             <div class="loading-card">
-              <div class="spinner" aria-hidden="true"></div>
-              <strong id="status-text">Preparing Newphorus…</strong>
+              <div class="spinner" aria-hidden="true"></div><strong id="status-text">Loading…</strong>
               <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
             </div>
           </div>
@@ -69,57 +57,30 @@
             <div class="error-card">
               <strong>Couldn’t load this project.</strong>
               <p id="error-text"></p>
-              <a href="https://github.com/itswiktoragain/newphorus/issues/new" target="_blank" rel="noreferrer">Report a problem ↗</a>
+              <a href="https://github.com/itswiktoragain/newphorus/issues/new" target="_blank" rel="noreferrer">Report issue ↗</a>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="tools-grid">
-        <section class="tool-card">
-          <p class="eyebrow">Embed</p>
-          <h2>Put this project on a page</h2>
-          <p>Copy an iframe that uses the Newphorus embed player.</p>
+      <div class="project-tools">
+        <div class="embed-tool">
+          <span class="tool-label">Embed</span>
           <input id="embed-code" class="code-field" readonly aria-label="Embed code">
-        </section>
-        <section class="tool-card">
-          <p class="eyebrow">Standalone</p>
-          <h2>Open the focused player</h2>
-          <p>Launch a clean player page for the currently loaded project.</p>
-          <a id="standalone-link" class="secondary-button inline-button" target="_blank">Open standalone player ↗</a>
-        </section>
+        </div>
+        <a id="standalone-link" class="secondary-button inline-button" target="_blank">Standalone ↗</a>
       </div>
-    </section>
-
-    <section class="info-grid">
-      <article>
-        <span class="feature-icon" aria-hidden="true">3</span>
-        <h2>Scratch 3 support</h2>
-        <p>Newphorus loads modern Scratch 3 projects and local .sb3 files, while retaining support for older project formats.</p>
-      </article>
-      <article>
-        <span class="feature-icon" aria-hidden="true">⚡</span>
-        <h2>Compiled runtime</h2>
-        <p>The execution backend uses TurboWarp’s compiler-enabled Scratch runtime for fast browser playback.</p>
-      </article>
-      <article>
-        <span class="feature-icon" aria-hidden="true">↔</span>
-        <h2>Responsive player</h2>
-        <p>The stage scales cleanly from desktop to mobile and includes fullscreen and turbo controls.</p>
-      </article>
     </section>
   </main>
 
   <footer>
     <span>Newphorus</span>
-    <span class="footer-separator">•</span>
-    <a href="https://github.com/itswiktoragain/newphorus/issues" target="_blank" rel="noreferrer">Report an issue</a>
+    <span>·</span>
+    <a href="https://github.com/itswiktoragain/newphorus/issues" target="_blank" rel="noreferrer">Issues</a>
   </footer>
 
-  <script src="https://cdn.jsdelivr.net/npm/@turbowarp/scaffolding@0.4.0/dist/scaffolding-min.js"></script>
-  <script src="newphorus.js?v=20260828-3"></script>
-  <script>
-    Newphorus.bootstrapHome();
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@turbowarp/scaffolding@0.4.0/dist/scaffolding-with-music.js"></script>
+  <script src="newphorus.js?v=20260828-4"></script>
+  <script>Newphorus.bootstrapHome();</script>
 </body>
 </html>
