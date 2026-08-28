@@ -74,6 +74,128 @@
     return !!(error && error.name === 'AbortError');
   }
 
+  // Based on TurboWarp Packager's pause behavior: pause Scratch threads and its clock,
+  // suspend audio, then repair active timers when execution resumes.
+  function installPauseController(scaffolding) {
+    var vm = scaffolding.vm;
+    var runtime = vm.runtime;
+    var STATUS_PROMISE_WAIT = 1;
+    var STATUS_DONE = 4;
+    var paused = false;
+    var savedThreads = new WeakMap();
+    var audioChange = Promise.resolve();
+
+    function getAudioContext() {
+      var engine = scaffolding.audioEngine || runtime.audioEngine;
+      return engine && (engine.audioContext || engine._audioContext);
+    }
+
+    function shiftTimer(timer, amount) {
+      if (timer && typeof timer.startTime === 'number') timer.startTime += amount;
+    }
+
+    function setPaused(next) {
+      next = !!next;
+      if (next === paused) return paused;
+      paused = next;
+
+      var audioContext = getAudioContext();
+      if (paused) {
+        if (audioContext && typeof audioContext.suspend === 'function') {
+          audioChange = audioChange.then(function () {
+            return audioContext.suspend();
+          }).catch(function () {});
+        }
+
+        var clock = runtime.ioDevices && runtime.ioDevices.clock;
+        if (clock && typeof clock.pause === 'function' && !clock._paused) clock.pause();
+
+        runtime.threads.forEach(function (thread) {
+          if (!thread.updateMonitor && !savedThreads.has(thread)) {
+            savedThreads.set(thread, {
+              pauseTime: runtime.currentMSecs,
+              status: thread.status
+            });
+            thread.status = STATUS_PROMISE_WAIT;
+          }
+        });
+
+        runtime.emit('PROJECT_RUN_STOP');
+        runtime.emit('RUNTIME_PAUSED');
+      } else {
+        if (audioContext && typeof audioContext.resume === 'function') {
+          audioChange = audioChange.then(function () {
+            return audioContext.resume();
+          }).catch(function () {});
+        }
+
+        var resumeClock = runtime.ioDevices && runtime.ioDevices.clock;
+        if (resumeClock && typeof resumeClock.resume === 'function' && resumeClock._paused) resumeClock.resume();
+
+        var now = Date.now();
+        runtime.threads.forEach(function (thread) {
+          var state = savedThreads.get(thread);
+          if (!state) return;
+          var delta = now - state.pauseTime;
+          var stackFrame = typeof thread.peekStackFrame === 'function' ? thread.peekStackFrame() : null;
+          if (stackFrame && stackFrame.executionContext) shiftTimer(stackFrame.executionContext.timer, delta);
+          if (thread.compatibilityStackFrame) shiftTimer(thread.compatibilityStackFrame.timer, delta);
+          shiftTimer(thread.timer, delta);
+          thread.status = state.status;
+        });
+        savedThreads = new WeakMap();
+        runtime.emit('RUNTIME_UNPAUSED');
+      }
+
+      return paused;
+    }
+
+    var originalStepThreads = runtime.sequencer.stepThreads;
+    runtime.sequencer.stepThreads = function () {
+      if (paused) {
+        this.runtime.threads.forEach(function (thread) {
+          if (thread.status === STATUS_DONE) return;
+          var state = savedThreads.get(thread);
+          if (state && thread.status !== STATUS_PROMISE_WAIT) {
+            state.status = thread.status;
+            thread.status = STATUS_PROMISE_WAIT;
+          }
+        });
+      }
+      return originalStepThreads.apply(this, arguments);
+    };
+
+    var originalGreenFlag = runtime.greenFlag;
+    runtime.greenFlag = function () {
+      setPaused(false);
+      return originalGreenFlag.apply(this, arguments);
+    };
+
+    var originalStartHats = runtime.startHats;
+    runtime.startHats = function () {
+      if (paused) return [];
+      return originalStartHats.apply(this, arguments);
+    };
+
+    if (typeof runtime._getMonitorThreadCount === 'function') {
+      var originalGetMonitorThreadCount = runtime._getMonitorThreadCount;
+      runtime._getMonitorThreadCount = function (threads) {
+        var count = originalGetMonitorThreadCount.call(this, threads);
+        if (paused) {
+          threads.forEach(function (thread) {
+            if (savedThreads.has(thread)) count++;
+          });
+        }
+        return count;
+      };
+    }
+
+    return {
+      setPaused: setPaused,
+      isPaused: function () { return paused; }
+    };
+  }
+
   function Player(options) {
     options = options || {};
     if (!window.Scaffolding || !window.Scaffolding.Scaffolding) {
@@ -86,6 +208,7 @@
     this.loadingOverlay = options.loadingOverlay;
     this.errorOverlay = options.errorOverlay;
     this.errorText = options.errorText;
+    this.startOverlay = options.startOverlay;
     this.autoStart = options.autoStart === true;
     this.projectId = '';
     this.projectTitle = '';
@@ -104,6 +227,7 @@
     this.runtime.setup();
     if (typeof this.runtime.setAccentColor === 'function') this.runtime.setAccentColor('#111111');
     configureStorage(this.runtime);
+    this.pauseController = installPauseController(this.runtime);
     this.runtime.appendTo(this.container);
 
     var self = this;
@@ -120,6 +244,7 @@
   };
 
   Player.prototype.showLoading = function () {
+    this.hideStartOverlay();
     if (this.loadingOverlay) {
       this.loadingOverlay.style.removeProperty('display');
       this.loadingOverlay.hidden = false;
@@ -136,8 +261,21 @@
     }
   };
 
+  Player.prototype.showStartOverlay = function () {
+    if (!this.startOverlay) return;
+    this.startOverlay.hidden = false;
+    this.startOverlay.removeAttribute('aria-hidden');
+  };
+
+  Player.prototype.hideStartOverlay = function () {
+    if (!this.startOverlay) return;
+    this.startOverlay.hidden = true;
+    this.startOverlay.setAttribute('aria-hidden', 'true');
+  };
+
   Player.prototype.showError = function (error) {
     this.hideLoading();
+    this.hideStartOverlay();
     if (this.errorText) this.errorText.textContent = error && error.message ? error.message : String(error);
     if (this.errorOverlay) this.errorOverlay.hidden = false;
     console.error(error);
@@ -154,8 +292,10 @@
 
   Player.prototype.resetProject = async function () {
     this.loaded = false;
+    this.hideStartOverlay();
     if (!this.runtime || !this.runtime.vm) return;
 
+    try { this.pauseController.setPaused(false); } catch (error) {}
     try { this.runtime.stopAll(); } catch (error) {}
     try {
       if (typeof this.runtime.vm.clear === 'function') {
@@ -197,8 +337,9 @@
       this.runtime.vm.start();
     }
     this.loaded = true;
-    this.progress(100, this.autoStart ? 'Ready' : 'Ready — press ▶ to start');
+    this.progress(100, this.autoStart ? 'Ready' : 'Ready — click the flag to start');
     this.hideLoading();
+    if (!this.autoStart) this.showStartOverlay();
     this.runtime.relayout();
   };
 
@@ -268,6 +409,8 @@
 
   Player.prototype.greenFlag = function () {
     if (!this.loaded) return;
+    this.pauseController.setPaused(false);
+    this.hideStartOverlay();
     this.unlockAudio();
     this.runtime.greenFlag();
     if (document.activeElement && typeof document.activeElement.blur === 'function') {
@@ -276,7 +419,23 @@
   };
 
   Player.prototype.stopAll = function () {
-    if (this.loaded) this.runtime.stopAll();
+    if (!this.loaded) return;
+    this.pauseController.setPaused(false);
+    this.runtime.stopAll();
+  };
+
+  Player.prototype.setPaused = function (paused) {
+    if (!this.loaded) return false;
+    if (paused) this.hideStartOverlay();
+    return this.pauseController.setPaused(paused);
+  };
+
+  Player.prototype.togglePause = function () {
+    return this.setPaused(!this.pauseController.isPaused());
+  };
+
+  Player.prototype.isPaused = function () {
+    return this.pauseController.isPaused();
   };
 
   Player.prototype.setTurbo = function (enabled) {
@@ -303,20 +462,69 @@
     setTimeout(player.relayout.bind(player), 50);
   }
 
+  function blurActiveElement() {
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+  }
+
+  function syncOpenGLButton(button) {
+    if (!button || !window.NewphorusGraphicsMode) return;
+    var enabled = window.NewphorusGraphicsMode.enabled;
+    button.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    button.textContent = enabled ? 'OpenGL on' : 'OpenGL off';
+    button.title = enabled ? 'Use high-performance WebGL rendering' : 'Use low-power compatibility WebGL rendering';
+  }
+
   function wireControls(player, fullscreenElement) {
-    document.getElementById('flag-button').addEventListener('click', function () {
+    var flagButton = document.getElementById('flag-button');
+    var pauseButton = document.getElementById('pause-button');
+    var stopButton = document.getElementById('stop-button');
+    var turboButton = document.getElementById('turbo-button');
+    var openGLButton = document.getElementById('opengl-button');
+    var fullscreenButton = document.getElementById('fullscreen-button');
+    var startOverlay = document.getElementById('start-overlay');
+
+    if (flagButton) flagButton.addEventListener('click', function () {
       player.greenFlag();
+      if (pauseButton) pauseButton.setAttribute('aria-pressed', 'false');
     });
-    document.getElementById('stop-button').addEventListener('click', function () {
+
+    if (startOverlay) startOverlay.addEventListener('click', function () {
+      player.greenFlag();
+      if (pauseButton) pauseButton.setAttribute('aria-pressed', 'false');
+    });
+
+    if (pauseButton) pauseButton.addEventListener('click', function (event) {
+      var paused = player.togglePause();
+      event.currentTarget.setAttribute('aria-pressed', paused ? 'true' : 'false');
+      event.currentTarget.title = paused ? 'Resume project' : 'Pause project';
+      blurActiveElement();
+    });
+
+    if (stopButton) stopButton.addEventListener('click', function () {
       player.stopAll();
+      if (pauseButton) pauseButton.setAttribute('aria-pressed', 'false');
+      blurActiveElement();
     });
-    document.getElementById('turbo-button').addEventListener('click', function (event) {
+
+    if (turboButton) turboButton.addEventListener('click', function (event) {
       event.currentTarget.setAttribute('aria-pressed', player.toggleTurbo() ? 'true' : 'false');
-      if (document.activeElement) document.activeElement.blur();
+      blurActiveElement();
     });
-    document.getElementById('fullscreen-button').addEventListener('click', function () {
+
+    syncOpenGLButton(openGLButton);
+    if (openGLButton && window.NewphorusGraphicsMode) {
+      openGLButton.addEventListener('click', function () {
+        window.NewphorusGraphicsMode.setEnabled(!window.NewphorusGraphicsMode.enabled);
+      });
+    }
+
+    if (fullscreenButton) fullscreenButton.addEventListener('click', function () {
       requestFullscreen(fullscreenElement, player);
+      blurActiveElement();
     });
+
     ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (name) {
       document.addEventListener(name, function () {
         setTimeout(player.relayout.bind(player), 50);
@@ -332,6 +540,7 @@
       loadingOverlay: document.getElementById('loading-overlay'),
       errorOverlay: document.getElementById('error-overlay'),
       errorText: document.getElementById('error-text'),
+      startOverlay: document.getElementById('start-overlay'),
       autoStart: autoStart
     });
   }
@@ -434,7 +643,9 @@
       loadId(initialId, false);
     } else {
       player.hideLoading();
+      player.hideStartOverlay();
     }
+
     return player;
   }
 
@@ -444,7 +655,8 @@
     var player = makePlayer(false);
     if (params.get('turbo') === 'true') {
       player.setTurbo(true);
-      document.getElementById('turbo-button').setAttribute('aria-pressed', 'true');
+      var turboButton = document.getElementById('turbo-button');
+      if (turboButton) turboButton.setAttribute('aria-pressed', 'true');
     }
     wireControls(player, document.getElementById('app-player'));
     if (!id) {
@@ -472,6 +684,8 @@
       if (!event.data || typeof event.data !== 'object') return;
       if (event.data.type === 'start') player.greenFlag();
       if (event.data.type === 'stop') player.stopAll();
+      if (event.data.type === 'pause') player.setPaused(true);
+      if (event.data.type === 'resume') player.setPaused(false);
       if (event.data.type === 'turbo') player.setTurbo(!!event.data.enabled);
     });
 
