@@ -80,7 +80,29 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@turbowarp/scaffolding@0.4.0/dist/scaffolding-with-music.js"></script>
-  <script src="newphorus.js?v=20260828-4"></script>
-  <script>Newphorus.bootstrapHome();</script>
+  <script src="newphorus.js?v=20260828-5"></script>
+  <script>
+    var newphorusPlayer = Newphorus.bootstrapHome();
+    var relayoutFrame = 0;
+
+    function refreshPointerGeometry() {
+      if (relayoutFrame) cancelAnimationFrame(relayoutFrame);
+      relayoutFrame = requestAnimationFrame(function () {
+        relayoutFrame = 0;
+        if (newphorusPlayer) newphorusPlayer.relayout();
+      });
+    }
+
+    // Scaffolding caches the stage's viewport rectangle for mouse coordinates.
+    // Refresh it whenever scrolling or viewport changes move the stage.
+    document.addEventListener('scroll', refreshPointerGeometry, {capture: true, passive: true});
+    window.addEventListener('resize', refreshPointerGeometry, {passive: true});
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('scroll', refreshPointerGeometry, {passive: true});
+      window.visualViewport.addEventListener('resize', refreshPointerGeometry, {passive: true});
+    }
+
+    refreshPointerGeometry();
+  </script>
 </body>
 </html>
